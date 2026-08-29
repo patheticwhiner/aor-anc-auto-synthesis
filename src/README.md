@@ -1,9 +1,19 @@
 # Source directory
 
-No implementation is present yet. Local Codex must complete the Phase 0 audit
-before creating a package.
+The `aor_anc` package currently implements Phase 0 only:
 
-The expected eventual modules are:
+- discrete-time model loading and diagnostics;
+- the independently derived direct and Youla closed-loop maps;
+- a source-exact reproduction of the declared external IMC-FxLMS baseline;
+- the one-command Phase 0 evidence runner.
+
+Run it from the repository root with:
+
+```bash
+uv run --extra test aor-anc-phase0 --config configs/experiment.yaml
+```
+
+Later phases may add:
 
 - model and uncertainty loading;
 - closed-loop map evaluation;
@@ -12,9 +22,5 @@ The expected eventual modules are:
 - notch-plane and weighted-right-inverse construction;
 - deterministic centre synthesis;
 - projected two-dimensional AOR;
-- IMC-FxLMS baselines;
+- robustly optimized IMC-FxLMS baselines;
 - certificate and reporting utilities.
-
-Module names and APIs must be fixed during Phase 0/1 rather than inferred from
-this placeholder.
-

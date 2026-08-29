@@ -1,6 +1,6 @@
 project:
   name: aor-anc-auto-synthesis
-  status: specification_only
+  status: phase0_blocked
 
 implementation:
   prototype_language: python
@@ -20,19 +20,110 @@ target:
   band_hz: [300.0, 420.0]
   attenuation_db_min: 10.0
   control_peak_limit: 4.0
-  disturbance_peak_bound: null
+  disturbance_peak_bound: 1.25
+  disturbance_peak_bound_units: normalized_error_sensor_amplitude
+  disturbance_peak_bound_scope: finite_phase0_T1_T2_records
   sensitivity_peak_limit: null
   out_of_band_limit: null
 
 models:
-  format: matlab_mat_or_discrete_transfer_function
-  nominal_secondary_path: null
-  existing_imc_fxlms_baseline: null
+  format: discrete_transfer_function_z_inverse
+  nominal_secondary_path:
+    id: cylinder1dm_2k_secondary_fir_20260713
+    role: nominal_complete_secondary_path
+    sample_rate_hz: 2000
+    numerator: [0.0, 0.055871190485584213, -0.076242979135970071,
+      0.13832791118008264, -0.3409355511254229, 0.37302804481491819,
+      -0.067010824716792219, -0.043327875168142287,
+      0.02022833624909955, -0.11146932989571433,
+      0.10717825538858378, -0.061663155646506422,
+      0.071073166794949641, -0.013148494410055578,
+      0.0046369888564560067, -0.030076756655083001,
+      0.013466631827378244]
+    denominator: [1.0]
+    input_delay_samples: 1
+    delay_encoding: leading_zero_in_numerator
+    input_units: normalized_actuator_command
+    output_units: normalized_error_sensor_amplitude
+    source_path: /home/dcol/Projects/MATLAB/ANC-Classic-Control-Simulations/sysid_models/20260713_cylinder1dm/LMS_20260713_secpath_N16_fs2k.mat
+    source_sha256: d7535ccc2eedc79b233de04d1dc57656e777cabb650750451f108e92f5e26b71
+    source_repository_commit: 53ed931bb48d1856cc2b17e87e73341753ad57e0
+    identification: measured_LMS_FIR_16_taps_resampled_from_48kHz
+    validation_error_ratio_percent: 6.09
+  alternative_secondary_path:
+    id: cylinder1dm_2k_secondary_armax_20260713
+    role: exploratory_model_form_discrepancy
+    sample_rate_hz: 2000
+    numerator: [0.0, -0.017922430205274752, 0.073184524558405503,
+      -0.24788462237878828, 0.16586778258866805,
+      0.21118523058580713, -0.24306784254882657,
+      0.03310062100283015, 0.019442193874882177]
+    denominator: [1.0, 0.45323462850628216, -0.23120161809428727,
+      0.38533882698309319, 0.36351985085831595]
+    input_delay_samples: 1
+    delay_encoding: leading_zero_in_numerator
+    source_path: /home/dcol/Projects/MATLAB/ANC-Classic-Control-Simulations/sysid_models/20260713_cylinder1dm/ARMAX_20260713_secpath_[4-8-2-1]_fs2k_sim90.mat
+    source_sha256: 2266791a80c03ab91d1d96f141b3fb8b3b26a1df8b3a0aeb1dbef95d48770101
+    source_repository_commit: 53ed931bb48d1856cc2b17e87e73341753ad57e0
+    validation_sim_fit_percent: 90.21
+    residual_whiteness: failed
+  existing_imc_fxlms_baseline:
+    id: anc_classic_controller_imc_fxlms_source_exact
+    implementation_mode: source_exact
+    source_path: /home/dcol/Projects/MATLAB/ANC-Classic-Control-Simulations/tests/internal/controller_imc_fxlms.m
+    source_sha256: 1c1afb67eaaa2030136af73c2862f3bb797725a599c59ac57f59bbfc039f8f62
+    source_repository_commit: 53ed931bb48d1856cc2b17e87e73341753ad57e0
+    scenario_data_path: /home/dcol/Projects/MATLAB/ANC-Classic-Control-Simulations/dataset/cylinder1dm_2k_stage_suite.mat
+    scenario_data_sha256: 61a80ee90aee3e81baa2ecfda9bafe9eb51688473b0c08546c7440bfde9488c6
+    split: evaluation
+    scenario_seed: 142
+    disturbance_rms_normalization: 0.8
+    signal_information: error_microphone_only
+    secondary_model_relation: perfect_model_S_equals_Shat
+    controller_fir_coefficients: 64
+    delta: 1.0e-4
+    ramp_seconds: 0.5
+    coefficient_norm_limit: 10.0
+    actuator_limit: 4.0
+    require_no_clipping: true
+    cases:
+      - id: T1
+        step_size: 0.01
+        golden_source_metrics:
+          attenuation_db: -3.2275541754082049
+          convergence_time_s: 0.10050000000000001
+          control_peak: 4.0
+          control_rms: 2.6998533116013079
+          unclipped_control_peak: 45.487058027369926
+          saturation_count: 8676
+          coefficient_norm: 7.105832554904099
+      - id: T2
+        step_size: 0.02
+        golden_source_metrics:
+          attenuation_db: 24.983910467701691
+          convergence_time_s: 0.10050000000000001
+          control_peak: 4.0
+          control_rms: 2.3952480752198491
+          unclipped_control_peak: 4.7903315007465297
+          saturation_count: 186
+          coefficient_norm: 0.80634043778589193
   uncertainty:
     type: weighted_additive
-    weight_model: null
+    id: cylinder1dm_model_form_constant_additive_v0
+    weight_model:
+      representation: constant_real_gain
+      gain: 2.19
+      units: normalized_error_sensor_per_normalized_actuator
+      frequency_scope_hz: [0.0, 1000.0]
+      construction_method: matlab_norm_inf_of_armax_minus_fir_with_fixed_outward_rounding
+      reference_hinf_norm: 2.1877287083385712
+      reference_hinf_relative_tolerance: 1.0e-10
+      reference_peak_frequency_hz: 877.69507962130319
+      outward_rounded_gain: 2.19
+      status: exploratory_not_physical_coverage
     delta_hinf_bound: 1.0
-    physical_definition: null
+    physical_definition: exploratory_disk_covering_the_FIR_ARMAX_model_form_difference_from_the_same_20260713_capture
+    coverage_limitation: not_a_probability_bound_and_not_validated_across_physical_operating_conditions
 
 youla:
   basis_type: fir_delay
@@ -59,3 +150,22 @@ reporting:
   record_git_commit: true
   output_directory: results
 
+phase0:
+  transfer_map_audit_grid_points: 4097
+  model_diagnostic_frequency_points: 8193
+  baseline_golden_relative_tolerance: 1.0e-10
+  blockers:
+    - path: implementation.hardware_target
+      reason: no_hardware_or_physical_IO_calibration_declared
+    - path: implementation.deterministic_solver
+      reason: not_selected_until_phase1
+    - path: target.sensitivity_peak_limit
+      reason: performance_weight_and_limit_not_declared
+    - path: target.out_of_band_limit
+      reason: out_of_band_weight_and_limit_not_declared
+    - path: youla.weighting_matrix_H_rule
+      reason: phase2_design_choice_not_declared
+    - path: models.uncertainty.physical_definition
+      reason: exploratory_model_form_disk_lacks_physical_coverage_evidence
+    - path: models.existing_imc_fxlms_baseline
+      reason: source_has_prestart_zero_residual_bug_and_only_supports_perfect_secondary_model
