@@ -1,0 +1,61 @@
+project:
+  name: aor-anc-auto-synthesis
+  status: specification_only
+
+implementation:
+  prototype_language: python
+  python_minimum_version: "3.11"
+  hardware_target: null
+  deterministic_solver: null
+  neural_generator_enabled: false
+
+signals:
+  sample_rate_hz: 2000
+  feedback_sign: negative
+  equations:
+    error: "e = d + G*u"
+    control: "u = -K*e"
+
+target:
+  band_hz: [300.0, 420.0]
+  attenuation_db_min: 10.0
+  control_peak_limit: 4.0
+  disturbance_peak_bound: null
+  sensitivity_peak_limit: null
+  out_of_band_limit: null
+
+models:
+  format: matlab_mat_or_discrete_transfer_function
+  nominal_secondary_path: null
+  existing_imc_fxlms_baseline: null
+  uncertainty:
+    type: weighted_additive
+    weight_model: null
+    delta_hinf_bound: 1.0
+    physical_definition: null
+
+youla:
+  basis_type: fir_delay
+  candidate_coefficient_counts: [2, 4, 6, 8, 12]
+  coefficient_type: real
+  stability_margin_epsilon_min: 0.05
+  adaptation_real_dimensions_per_tone: 2
+  weighting_matrix_H_rule: null
+
+frequency_discretization:
+  synthesis_grid_points: 121
+  verification_grid_points: 1201
+  continuous_band_certificate: false
+
+numerics:
+  random_seed: 0
+  equality_tolerance: 1.0e-8
+  feasibility_tolerance: 1.0e-7
+  frequency_response_relative_tolerance: 1.0e-8
+
+reporting:
+  save_all_configs: true
+  save_solver_logs: true
+  record_git_commit: true
+  output_directory: results
+

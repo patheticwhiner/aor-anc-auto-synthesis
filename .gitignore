@@ -1,0 +1,31 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+dist/
+build/
+*.egg-info/
+
+# Generated numerical outputs
+results/*
+!results/README.md
+
+# Large/local model data
+data/models/*
+!data/models/README.md
+
+# MATLAB and editor artifacts
+*.asv
+slprj/
+*.slxc
+*.autosave
+.vscode/
+.idea/
+
+# OS files
+.DS_Store
+Thumbs.db
+
