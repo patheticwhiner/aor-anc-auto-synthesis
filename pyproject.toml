@@ -19,6 +19,7 @@ test = ["pytest>=8.3"]
 
 [project.scripts]
 aor-anc-phase0 = "aor_anc.phase0:main"
+aor-anc-phase0-5a = "aor_anc.phase0_5a:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/aor_anc"]

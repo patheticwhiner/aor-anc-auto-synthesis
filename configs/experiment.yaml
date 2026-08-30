@@ -1,6 +1,6 @@
 project:
   name: aor-anc-auto-synthesis
-  status: phase0_blocked
+  status: phase0_5a_complete_phase0_blocked
 
 implementation:
   prototype_language: python
@@ -107,6 +107,77 @@ models:
           unclipped_control_peak: 4.7903315007465297
           saturation_count: 186
           coefficient_norm: 0.80634043778589193
+  fair_imc_fxlms_baseline:
+    id: corrected_information_fair_imc_fxlms_v0
+    implementation_mode: corrected_information_fair
+    qualification: phase0_5a_structure_only_not_robustly_optimized
+    scenario_data_path: /home/dcol/Projects/MATLAB/ANC-Classic-Control-Simulations/dataset/cylinder1dm_2k_stage_suite.mat
+    scenario_data_sha256: 61a80ee90aee3e81baa2ecfda9bafe9eb51688473b0c08546c7440bfde9488c6
+    split: evaluation
+    scenario_seed: 142
+    disturbance_rms_normalization: 0.8
+    sample_indexing: zero_based
+    feedback_equations:
+      residual: "e[k] = d[k] + S(q)u[k]"
+      reconstructed_disturbance: "d_hat[k] = e[k] - Shat(q)u[k]"
+      control: "u_demand[k] = -theta[k]^T*d_hat_vector[k]"
+    controller_fir_coefficients: 64
+    normalization_delta: 1.0e-4
+    coefficient_projection:
+      type: l2_ball
+      radius: 10.0
+    actuator_saturation:
+      type: symmetric_hard_clip
+      limit: 4.0
+    require_no_clipping: true
+    adaptation_start_sample: 1000
+    controller_regressor_delay_samples: 1
+    actuation_ramp_samples: 1000
+    adaptation_during_saturation: continue_using_applied_control_history
+    evaluation_metrics:
+      target_attenuation_db: 10.0
+      evaluation_start_sample: 1000
+      evaluation_stop_sample_exclusive: 20000
+      sustain_duration_samples: 400
+      metric_step_samples: 100
+    plant_information_budget:
+      id: complete_shat_error_mic_no_true_path_v0
+      offline_controller_available:
+        internal_secondary_path: complete_coefficients_sample_rate_and_delay
+        uncertainty_description: available_but_not_optimized_in_phase0_5a
+        true_evaluation_path: unavailable
+        evaluation_disturbance_records: unavailable_for_tuning
+      online_controller_available:
+        error_microphone: true
+        applied_control_history: true
+        internal_secondary_path_state: true
+        physical_source_reference: false
+        true_secondary_path_output_or_state: false
+      evaluation_engine_only:
+        true_secondary_path: complete_configured_model
+      controller_order_budget: 64_real_fir_coefficients
+      parameter_selection: inherited_predeclared_phase0_source_steps_no_retuning
+    cases:
+      - id: T1_U0_perfect_model
+        signal_id: T1
+        true_secondary_path_model_id: cylinder1dm_2k_secondary_fir_20260713
+        internal_secondary_path_model_id: cylinder1dm_2k_secondary_fir_20260713
+        step_size: 0.01
+      - id: T2_U0_perfect_model
+        signal_id: T2
+        true_secondary_path_model_id: cylinder1dm_2k_secondary_fir_20260713
+        internal_secondary_path_model_id: cylinder1dm_2k_secondary_fir_20260713
+        step_size: 0.02
+      - id: T1_model_form_mismatch
+        signal_id: T1
+        true_secondary_path_model_id: cylinder1dm_2k_secondary_armax_20260713
+        internal_secondary_path_model_id: cylinder1dm_2k_secondary_fir_20260713
+        step_size: 0.01
+      - id: T2_model_form_mismatch
+        signal_id: T2
+        true_secondary_path_model_id: cylinder1dm_2k_secondary_armax_20260713
+        internal_secondary_path_model_id: cylinder1dm_2k_secondary_fir_20260713
+        step_size: 0.02
   uncertainty:
     type: weighted_additive
     id: cylinder1dm_model_form_constant_additive_v0
@@ -167,5 +238,11 @@ phase0:
       reason: phase2_design_choice_not_declared
     - path: models.uncertainty.physical_definition
       reason: exploratory_model_form_disk_lacks_physical_coverage_evidence
-    - path: models.existing_imc_fxlms_baseline
-      reason: source_has_prestart_zero_residual_bug_and_only_supports_perfect_secondary_model
+    - path: models.fair_imc_fxlms_baseline
+      reason: corrected_structure_exists_but_robust_optimization_requires_physical_path_set
+
+phase0_5a:
+  source_exact_function_sha256: 160ffe992c9d23ea896fdda8c2038a4ee9e804ea2fe9931395d7140faf9552ed
+  corrected_baseline_result_directory: phase0_5a
+  no_superiority_claim: true
+  no_robust_stability_claim: true

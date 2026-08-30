@@ -51,8 +51,10 @@ asking. Stop if the deterministic formulation or fair baseline is ambiguous.
 
 - Specification: Phase 0 algebraically and numerically audited; see
   [docs/PHASE0_AUDIT.md](docs/PHASE0_AUDIT.md).
-- Phase 0: stopped with declared uncertainty, baseline-startup, and physical
-  calibration blockers.
+- Phase 0: still stopped by uncertainty and physical-calibration blockers.
+- Phase 0.5A baseline: corrected physical startup and independent true/internal
+  secondary paths implemented; see
+  [docs/PHASE0_5A_BASELINE_AUDIT.md](docs/PHASE0_5A_BASELINE_AUDIT.md).
 - Deterministic synthesizer: not implemented.
 - AOR convergence proof: proof obligations listed, not yet discharged.
 - IMC-FxLMS separation: unverified Go/No-Go question.
@@ -63,4 +65,5 @@ Reproduce the Phase 0 evidence with:
 ```bash
 uv run --extra test pytest
 uv run aor-anc-phase0 --config configs/experiment.yaml
+uv run aor-anc-phase0-5a --config configs/experiment.yaml
 ```

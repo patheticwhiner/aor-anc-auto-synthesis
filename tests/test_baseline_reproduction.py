@@ -1,15 +1,23 @@
 from __future__ import annotations
 
+import hashlib
+import inspect
 from pathlib import Path
 
 import pytest
 import yaml
 
 from aor_anc.phase0 import run_phase0
+from aor_anc.baseline import run_source_exact
 
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 CONFIG_PATH = REPOSITORY / "configs" / "experiment.yaml"
+
+
+def test_source_exact_implementation_is_unchanged() -> None:
+    digest = hashlib.sha256(inspect.getsource(run_source_exact).encode()).hexdigest()
+    assert digest == "160ffe992c9d23ea896fdda8c2038a4ee9e804ea2fe9931395d7140faf9552ed"
 
 
 def _external_sources_present() -> bool:
