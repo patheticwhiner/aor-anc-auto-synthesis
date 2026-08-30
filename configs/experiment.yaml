@@ -1,6 +1,6 @@
 project:
   name: aor-anc-auto-synthesis
-  status: phase0_5a_complete_phase0_blocked
+  status: phase0_5b_complete_phase0_blocked
 
 implementation:
   prototype_language: python
@@ -138,6 +138,7 @@ models:
       target_attenuation_db: 10.0
       evaluation_start_sample: 1000
       evaluation_stop_sample_exclusive: 20000
+      tail_evaluation_start_sample: 16000
       sustain_duration_samples: 400
       metric_step_samples: 100
     plant_information_budget:
@@ -239,10 +240,135 @@ phase0:
     - path: models.uncertainty.physical_definition
       reason: exploratory_model_form_disk_lacks_physical_coverage_evidence
     - path: models.fair_imc_fxlms_baseline
-      reason: corrected_structure_exists_but_robust_optimization_requires_physical_path_set
+      reason: exploratory_optimized_baseline_exists_but_requires_physical_path_set
 
 phase0_5a:
   source_exact_function_sha256: 160ffe992c9d23ea896fdda8c2038a4ee9e804ea2fe9931395d7140faf9552ed
   corrected_baseline_result_directory: phase0_5a
+  no_superiority_claim: true
+  no_robust_stability_claim: true
+
+phase0_5b:
+  result_directory: phase0_5b
+  stability_pole_radius_tolerance: 1.0e-10
+  benchmark_family:
+    id: fir_armax_convex_model_form_path_v0
+    qualification: exploratory_model_form_benchmark_not_physical_uncertainty
+    construction: "S_alpha = (1-alpha)*S_FIR + alpha*S_ARMAX"
+    physical_uncertainty_interpretation: false
+    limitation: does_not_represent_real_operating_condition_variation
+    design_alphas: [0.0, 0.5, 1.0]
+    heldout_alphas: [0.25, 0.75]
+    design_frequencies_hz: [300.0, 420.0]
+    heldout_frequencies_hz: [330.0, 360.0, 390.0]
+  synthetic_tone_cases:
+    construction: deterministic_single_tone
+    sample_count: 4000
+    disturbance_rms: 0.8
+    phase_rad: 0.0
+    random_seed: null
+  candidate_baseline:
+    id: constrained_robustly_tuned_information_fair_imc_fxlms_v0
+    controller_fir_coefficients: 64
+    normalization_delta: 1.0e-4
+    actuator_limit: 4.0
+    adaptation_start_sample: 500
+    controller_regressor_delay_samples: 1
+    actuation_ramp_samples: 500
+    actuator_slab_relative_margin: 1.0e-12
+    coefficient_projection: l2_ball
+  design_evaluation_metrics:
+    target_attenuation_db: 10.0
+    evaluation_start_sample: 500
+    evaluation_stop_sample_exclusive: 4000
+    tail_evaluation_start_sample: 3000
+    sustain_duration_samples: 200
+    metric_step_samples: 100
+  heldout_evaluation_metrics:
+    target_attenuation_db: 10.0
+    evaluation_start_sample: 500
+    evaluation_stop_sample_exclusive: 4000
+    tail_evaluation_start_sample: 3000
+    sustain_duration_samples: 200
+    metric_step_samples: 100
+  plant_information_budget:
+    id: complete_design_family_shat_no_true_evaluation_path_v0
+    common_to_every_candidate: true
+    offline_parameter_selection_available:
+      endpoint_models: complete_FIR_and_ARMAX_coefficients_sample_rate_and_delay
+      benchmark_construction: complete_formula_and_design_alpha_grid
+      design_frequencies: complete_design_frequency_grid
+      internal_model_centres: predeclared_beta_grid
+      heldout_alpha_values: unavailable
+      heldout_frequencies: unavailable
+      T1_T2_evaluation_records: unavailable
+      true_evaluation_path: unavailable
+    online_controller_available:
+      error_microphone: true
+      applied_control_history: true
+      selected_internal_secondary_path_state: true
+      physical_source_reference: false
+      true_secondary_path_output_or_state: false
+    evaluation_engine_only:
+      true_secondary_path: complete_case_model
+      heldout_cases: true
+      T1_T2_records: true
+    controller_order_budget: 64_real_fir_coefficients
+  search:
+    method: deterministic_lexicographic_coarse_to_fine_finite_search
+    constraint_modes:
+      - id: coefficient_ball_continue
+        freeze_update_on_saturation: false
+        actuator_slab_projection: false
+      - id: coefficient_ball_freeze
+        freeze_update_on_saturation: true
+        actuator_slab_projection: false
+      - id: coefficient_ball_slab_freeze
+        freeze_update_on_saturation: true
+        actuator_slab_projection: true
+    coarse_grid:
+      internal_model_beta: [0.0, 0.5, 1.0]
+      step_size: [0.002, 0.01, 0.05]
+      leakage: [0.0, 0.1]
+      coefficient_projection_radius: [0.5, 2.0]
+      constraint_mode_ids:
+        - coefficient_ball_continue
+        - coefficient_ball_freeze
+        - coefficient_ball_slab_freeze
+    fine_grid:
+      internal_model_beta_offsets: [-0.25, 0.0, 0.25]
+      step_size_multipliers: [0.5, 1.0, 2.0]
+      leakage: [0.0, 0.1]
+      coefficient_projection_radius_multipliers: [0.5, 1.0, 2.0]
+      retain_selected_constraint_mode: true
+    budgets:
+      design_case_count: 6
+      samples_per_design_case: 4000
+      max_coarse_candidates: 108
+      max_fine_candidates: 54
+      max_total_candidates: 162
+      maximum_candidate_case_simulations_without_early_rejection: 972
+  selection_order:
+    - reject_numerical_failure_or_requested_control_above_4
+    - maximize_design_tail_worst_sustained_attenuation_db
+    - maximize_design_settled_case_count
+    - minimize_design_worst_settled_time_to_10db
+    - minimize_design_worst_control_rms
+    - minimize_design_worst_controller_coefficient_norm
+    - deterministic_candidate_id_tie_break
+  evaluation_records:
+    scenario_data_path: /home/dcol/Projects/MATLAB/ANC-Classic-Control-Simulations/dataset/cylinder1dm_2k_stage_suite.mat
+    scenario_data_sha256: 61a80ee90aee3e81baa2ecfda9bafe9eb51688473b0c08546c7440bfde9488c6
+    split: evaluation
+    signal_ids: [T1, T2]
+    scenario_seed: 142
+    disturbance_rms_normalization: 0.8
+    evaluation_metrics:
+      target_attenuation_db: 10.0
+      evaluation_start_sample: 1000
+      evaluation_stop_sample_exclusive: 20000
+      tail_evaluation_start_sample: 16000
+      sustain_duration_samples: 400
+      metric_step_samples: 100
   no_superiority_claim: true
   no_robust_stability_claim: true

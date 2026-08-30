@@ -25,6 +25,49 @@ Acceptance criteria:
 
 Stop condition: sign, model, baseline, or uncertainty ambiguity remains.
 
+## Phase 0.5A — Corrected information-fair IMC-FxLMS baseline
+
+Tasks:
+
+1. Preserve source-exact MATLAB reproduction as a historical regression mode.
+2. Implement physical startup and independent true/internal secondary paths.
+3. Report pre-clipping demand, applied control, projection, clipping, and
+   feasibility under a predeclared information budget.
+4. Replace fallback convergence timing with explicit reached/not-reached
+   metrics.
+
+Status: completed at commit `5b6d028`; Phase 0 remained blocked.
+
+## Phase 0.5B — Constrained robust fair-baseline optimization
+
+Tasks:
+
+1. Retain first-hit time-to-10-dB only as a diagnostic; add settled time,
+   tail-worst sustained attenuation, and loss-of-regulation count.
+2. Construct a stable, delayed FIR--ARMAX interpolation family with strictly
+   disjoint design and held-out alpha/frequency grids. Label it exploratory
+   model-form evidence, not physical uncertainty.
+3. Search normalized, leaky, coefficient-ball, freeze-on-saturation, and
+   instantaneous actuator-slab variants with robustly centred internal models.
+4. Perform deterministic lexicographic coarse-to-fine selection using design
+   cases only, rejecting every numerical failure and requested control above 4.
+5. Freeze the selected parameters before one-shot held-out and T1/T2
+   evaluation. Report arithmetic operation counts and all constraint events.
+
+Acceptance criteria:
+
+- selected demand is at most 4 on every design case without weakening the
+  declared limit;
+- changing held-out inputs cannot affect parameter selection;
+- a temporary target crossing is never described as convergence;
+- the strongest feasible finite-search candidate is retained even if it does
+  not attain 10 dB;
+- no physical-uncertainty, robust-stability, or superiority claim is made.
+
+Stop condition: no no-clipping perfect-model candidate, invalid path
+interpolation, inseparable data splits, evaluation-dependent selection, or any
+silent actuator-limit relaxation.
+
 ## Phase 1 — Deterministic safe-set prototype
 
 Tasks:
@@ -163,4 +206,3 @@ Acceptance criteria:
 - no accepted controller lacks a deterministic certificate;
 - near-oracle performance on held-out plant/constraint tasks;
 - explicit safe fallback on rejection.
-

@@ -55,6 +55,9 @@ asking. Stop if the deterministic formulation or fair baseline is ambiguous.
 - Phase 0.5A baseline: corrected physical startup and independent true/internal
   secondary paths implemented; see
   [docs/PHASE0_5A_BASELINE_AUDIT.md](docs/PHASE0_5A_BASELINE_AUDIT.md).
+- Phase 0.5B baseline: constrained design-only robust tuning and frozen
+  held-out evaluation implemented; see
+  [docs/PHASE0_5B_ROBUST_BASELINE_AUDIT.md](docs/PHASE0_5B_ROBUST_BASELINE_AUDIT.md).
 - Deterministic synthesizer: not implemented.
 - AOR convergence proof: proof obligations listed, not yet discharged.
 - IMC-FxLMS separation: unverified Go/No-Go question.
@@ -66,4 +69,5 @@ Reproduce the Phase 0 evidence with:
 uv run --extra test pytest
 uv run aor-anc-phase0 --config configs/experiment.yaml
 uv run aor-anc-phase0-5a --config configs/experiment.yaml
+uv run aor-anc-phase0-5b --config configs/experiment.yaml
 ```

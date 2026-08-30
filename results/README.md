@@ -28,3 +28,14 @@ JSON evidence log and CSV table. The runner first verifies that the historical
 `source_exact` implementation and MATLAB golden reproduction are unchanged.
 Phase 0.5A validates baseline structure and reporting only; it is not a robust
 optimization or a superiority result.
+
+Phase 0.5B evidence is generated with:
+
+```bash
+uv run aor-anc-phase0-5b --config configs/experiment.yaml
+```
+
+The ignored `results/phase0_5b/` directory contains the complete candidate
+search table, frozen design/held-out/T1/T2 result table, and JSON evidence log.
+The interpolated family is an exploratory model-form benchmark, not a physical
+uncertainty set or robust-stability certificate.

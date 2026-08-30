@@ -92,6 +92,9 @@ def run_phase0_5a(config_path: Path) -> dict[str, Any]:
         ),
         sustain_duration_samples=int(metric_config["sustain_duration_samples"]),
         metric_step_samples=int(metric_config["metric_step_samples"]),
+        tail_evaluation_start_sample=int(
+            metric_config["tail_evaluation_start_sample"]
+        ),
     )
 
     fair_results: list[dict[str, Any]] = []
@@ -223,6 +226,14 @@ def run_phase0_5a(config_path: Path) -> dict[str, Any]:
             }
             for result in fair_results
         },
+        "time_to_10db_semantics": "first_hit_diagnostic_not_convergence",
+        "settled_time_to_10db": {
+            result["case_id"]: {
+                "status": result["settled_time_to_10db_status"],
+                "seconds": result["settled_time_to_10db_seconds"],
+            }
+            for result in fair_results
+        },
         "robust_stability_margin": None,
         "robust_stability_status": "not_certified_in_phase0_5a",
         "remaining_blockers": config["phase0"]["blockers"],
@@ -245,6 +256,7 @@ def run_phase0_5a(config_path: Path) -> dict[str, Any]:
         "adaptation_start_sample",
         "evaluation_start_sample",
         "evaluation_stop_sample_exclusive",
+        "tail_evaluation_start_sample",
         "sustain_duration_samples",
         "step_size",
         "evaluation_attenuation_db",
@@ -252,6 +264,9 @@ def run_phase0_5a(config_path: Path) -> dict[str, Any]:
         "best_sustained_attenuation_db",
         "time_to_10db_status",
         "time_to_10db_seconds",
+        "settled_time_to_10db_status",
+        "settled_time_to_10db_seconds",
+        "loss_of_regulation_count",
         "control_demand_peak",
         "control_demand_rms",
         "applied_control_peak",
@@ -259,6 +274,7 @@ def run_phase0_5a(config_path: Path) -> dict[str, Any]:
         "saturation_count",
         "saturation_fraction",
         "coefficient_projection_count",
+        "actuator_slab_projection_count",
         "final_coefficient_norm",
         "feasible",
         "infeasibility_reasons",

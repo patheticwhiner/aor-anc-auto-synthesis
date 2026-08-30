@@ -14,6 +14,12 @@
   explicit demand, clipping, projection, feasibility, and information-budget
   reporting. All four frozen runs clip and are infeasible under the declared
   no-clipping rule.
+- Phase 0.5B corrects settled-performance metrics and performs a deterministic,
+  design-only constrained search over robustly centred normalized/leaky/
+  projected IMC-FxLMS candidates. The selected finite-search candidate is
+  no-clipping feasible on all declared design, held-out benchmark, and T1/T2
+  cases. The interpolation family remains exploratory model-form evidence, not
+  physical uncertainty.
 - No deterministic synthesizer has been implemented.
 - The small-gain and safe-bound algebra has been audited, but no theorem or
   robust-stability margin has been numerically certified for a synthesized
@@ -131,3 +137,58 @@
   uncertainty set; calibration, `Ms`, and out-of-band limits remain absent.
 - Decision: Phase 0.5A implementation complete; **no-go / remain in Phase 0**.
   Do not begin Phase 1 or `K0` synthesis.
+
+### 2026-08-30 — Phase 0.5B constrained robust fair-baseline optimization
+
+- Commit: based on `5b6d028be2fa533059a4d0434dd1e2ae12f0fecf` plus Phase
+  0.5B working-tree changes; final commit reported at completion.
+- Configuration: `configs/experiment.yaml`;
+  `constrained_robustly_tuned_information_fair_imc_fxlms_v0`.
+- Model/uncertainty ID: FIR/ARMAX interpolation family
+  `fir_armax_convex_model_form_path_v0` /
+  `cylinder1dm_model_form_constant_additive_v0`. Family qualification:
+  `exploratory_model_form_benchmark_not_physical_uncertainty`.
+- Exact sets: design alpha `[0,0.5,1]` at `[300,420]` Hz; held-out alpha
+  `[0.25,0.75]` at `[330,360,390]` Hz; T1/T2 records loaded only after
+  selection. Synthetic records contain 4000 samples, RMS 0.8, phase 0.
+- Command: `uv run --extra test pytest`; `uv run aor-anc-phase0-5b --config
+  configs/experiment.yaml`.
+- Solver and tolerances: deterministic finite lexicographic coarse-to-fine
+  search; pole-radius tolerance `1e-10`; normalized denominator delta `1e-4`;
+  hard demand limit 4; slab interior relative margin `1e-12`.
+- Search: 108 coarse and 52 unique fine candidates, 160 total. Grids are beta
+  `[0,0.5,1]`, mu `[0.002,0.01,0.05]`, leakage `[0,0.1]`, radius `[0.5,2]`,
+  three constraint modes; fine beta offsets `[-0.25,0,0.25]`, mu multipliers
+  `[0.5,1,2]`, leakage `[0,0.1]`, and radius multipliers `[0.5,1,2]`.
+- Selected parameters: beta `0.5`, mu `0.1`, leakage `0`, L2 radius `1`,
+  freeze-after-saturation anti-windup, and instantaneous actuator-slab
+  projection. `Shat_beta_0.5` is stable, causal, proper, and has one sample of
+  delay; its maximum denominator-pole radius is 0.8063523.
+- Design result: all 6 cases feasible and settled; tail-worst attenuation
+  15.6901 dB; full-window worst sustained 2.1879 dB; worst settled time 0.200
+  s; demand peak 3.999999999996002; applied RMS 2.8213; 1859 coefficient-ball
+  and 1781 slab projections; zero clipping and loss-of-regulation windows.
+- One-shot held-out result: all 6 cases feasible and settled without retuning;
+  tail-worst 25.7166 dB; full-window worst sustained 2.5646 dB; worst settled
+  time 0.200 s; demand peak 3.999999999996002; applied RMS 2.8203; 1773 ball
+  and 1462 slab projections; zero clipping and loss-of-regulation windows.
+- Frozen T1/T2 result: evaluation attenuation 38.7731/33.3397 dB; tail-worst
+  38.1909/34.7528 dB; settled time 0.450/0.450 s; demand peak
+  3.3465/3.6330; 287/1522 ball projections, zero slab projections and zero
+  clipping. Both are feasible.
+- Metric correction: first-hit `time_to_10db` remains diagnostic only. Settled
+  time requires all remaining windows to stay above target; tail-worst and
+  loss-of-regulation count are reported. No transient hit is called
+  convergence.
+- Operation count: selected controller ordinary sample 372 multiplications,
+  307 additions/subtractions, 3 divisions, 1 square root; worst sample with
+  ball and slab projection 628, 498, 5, and 1 respectively. Memory, comparisons,
+  and evaluation-engine true-path filtering are excluded.
+- Robust-stability margin: not certified. No superiority claim is made.
+- Failed assumptions or contradictions: the interpolation family has no
+  physical operating-condition coverage; calibration, `Ms`, and out-of-band
+  limits remain absent. Near-numerical-floor pure-tone attenuation is not a
+  physical claim.
+- Decision: strongest feasible candidate in the declared finite search is
+  retained; Phase 0.5B complete, **no-go / remain in Phase 0**. Do not begin
+  Phase 1 or `K0` synthesis.

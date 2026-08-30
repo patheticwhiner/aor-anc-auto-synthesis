@@ -26,12 +26,20 @@ class FairBaselineParameters:
     controller_regressor_delay_samples: int
     require_no_clipping: bool
     initial_coefficients: np.ndarray | None = None
+    leakage: float = 0.0
+    freeze_update_on_saturation: bool = False
+    actuator_slab_projection: bool = False
+    actuator_slab_relative_margin: float = 1e-12
 
     def validate(self) -> None:
         if self.controller_coefficients <= 0:
             raise ValueError("controller coefficient count must be positive")
         if self.step_size < 0.0:
             raise ValueError("normalized FxLMS step size must be nonnegative")
+        if self.leakage < 0.0:
+            raise ValueError("leakage must be nonnegative")
+        if self.step_size * self.leakage > 1.0:
+            raise ValueError("step size times leakage must not exceed one")
         if self.normalization_delta <= 0.0:
             raise ValueError("normalization delta must be positive")
         if self.coefficient_projection_radius <= 0.0:
@@ -44,6 +52,8 @@ class FairBaselineParameters:
             raise ValueError("actuation ramp samples must be nonnegative")
         if self.controller_regressor_delay_samples < 1:
             raise ValueError("controller regressor needs at least one sample delay")
+        if not 0.0 <= self.actuator_slab_relative_margin < 1.0:
+            raise ValueError("actuator slab relative margin must lie in [0, 1)")
         if self.initial_coefficients is not None:
             initial = np.asarray(self.initial_coefficients, dtype=float).reshape(-1)
             if initial.size != self.controller_coefficients:
@@ -63,6 +73,8 @@ class FairBaselineRun:
     reconstructed_disturbance: np.ndarray
     filtered_x: np.ndarray
     coefficient_projected: np.ndarray
+    actuator_slab_projected: np.ndarray
+    coefficient_update_frozen: np.ndarray
     numerical_failure: np.ndarray
     coefficients: np.ndarray
     adaptation_start_sample: int
@@ -77,6 +89,7 @@ class FairMetricSpecification:
     evaluation_stop_sample: int | None
     sustain_duration_samples: int
     metric_step_samples: int
+    tail_evaluation_start_sample: int | None = None
 
     def validate(self, sample_count: int, adaptation_start_sample: int) -> None:
         stop = sample_count if self.evaluation_stop_sample is None else self.evaluation_stop_sample
@@ -92,6 +105,15 @@ class FairMetricSpecification:
             raise ValueError("metric step must be positive")
         if stop - self.evaluation_start_sample < self.sustain_duration_samples:
             raise ValueError("evaluation window is shorter than sustain duration")
+        tail_start = (
+            self.evaluation_start_sample
+            if self.tail_evaluation_start_sample is None
+            else self.tail_evaluation_start_sample
+        )
+        if not self.evaluation_start_sample <= tail_start < stop:
+            raise ValueError("tail evaluation starts outside the evaluation window")
+        if stop - tail_start < self.sustain_duration_samples:
+            raise ValueError("tail evaluation segment is shorter than sustain duration")
 
 
 def _filter_sample(
@@ -122,11 +144,11 @@ def _delayed_vector(
     signal: np.ndarray, index: int, delay_samples: int, length: int
 ) -> np.ndarray:
     vector = np.zeros(length, dtype=float)
-    for offset in range(length):
-        source_index = index - delay_samples - offset
-        if source_index < 0:
-            break
-        vector[offset] = signal[source_index]
+    newest = index - delay_samples
+    if newest >= 0:
+        oldest = max(0, newest - length + 1)
+        values = signal[oldest : newest + 1][::-1]
+        vector[: values.size] = values
     return vector
 
 
@@ -173,6 +195,8 @@ def run_fair_imc_fxlms(
     reconstructed = np.zeros(sample_count, dtype=float)
     filtered_x = np.zeros(sample_count, dtype=float)
     projected = np.zeros(sample_count, dtype=bool)
+    slab_projected = np.zeros(sample_count, dtype=bool)
+    update_frozen = np.zeros(sample_count, dtype=bool)
     numerical_failure = np.zeros(sample_count, dtype=bool)
 
     if parameters.initial_coefficients is None:
@@ -220,18 +244,6 @@ def run_fair_imc_fxlms(
             parameters.controller_coefficients,
         )
 
-        normalization = float(filtered_vector @ filtered_vector)
-        normalization += parameters.normalization_delta
-        coefficients += (
-            parameters.step_size * residual[index] * filtered_vector / normalization
-        )
-
-        coefficient_norm = float(np.linalg.norm(coefficients))
-        if coefficient_norm > parameters.coefficient_projection_radius:
-            coefficients *= parameters.coefficient_projection_radius / coefficient_norm
-            projected[index] = True
-
-        request = -float(coefficients @ disturbance_vector)
         if parameters.actuation_ramp_samples:
             ramp = min(
                 1.0,
@@ -241,7 +253,60 @@ def run_fair_imc_fxlms(
                     / parameters.actuation_ramp_samples,
                 ),
             )
-            request *= ramp
+        else:
+            ramp = 1.0
+
+        freeze_update = (
+            parameters.freeze_update_on_saturation
+            and index > parameters.adaptation_start_sample
+            and clipped[index - 1]
+        )
+        if freeze_update:
+            update_frozen[index] = True
+        else:
+            normalization = float(filtered_vector @ filtered_vector)
+            normalization += parameters.normalization_delta
+            if parameters.leakage:
+                coefficients *= 1.0 - parameters.step_size * parameters.leakage
+            coefficients += (
+                parameters.step_size
+                * residual[index]
+                * filtered_vector
+                / normalization
+            )
+
+            coefficient_norm = float(np.linalg.norm(coefficients))
+            if coefficient_norm > parameters.coefficient_projection_radius:
+                coefficients *= (
+                    parameters.coefficient_projection_radius / coefficient_norm
+                )
+                projected[index] = True
+
+        effective_control_vector = ramp * disturbance_vector
+        signed_demand = float(coefficients @ effective_control_vector)
+        if parameters.actuator_slab_projection and effective_control_vector.any():
+            slab_limit = parameters.actuator_limit * (
+                1.0 - parameters.actuator_slab_relative_margin
+            )
+            if abs(signed_demand) > slab_limit:
+                vector_norm_squared = float(
+                    effective_control_vector @ effective_control_vector
+                )
+                if vector_norm_squared > 0.0:
+                    slab_target = float(
+                        np.clip(signed_demand, -slab_limit, slab_limit)
+                    )
+                    coefficients -= (
+                        (signed_demand - slab_target)
+                        / vector_norm_squared
+                        * effective_control_vector
+                    )
+                    slab_projected[index] = True
+                    signed_demand = float(
+                        coefficients @ effective_control_vector
+                    )
+
+        request = -signed_demand
         if not np.isfinite(request):
             numerical_failure[index] = True
             request = 0.0
@@ -250,7 +315,7 @@ def run_fair_imc_fxlms(
         applied_control[index] = float(
             np.clip(request, -parameters.actuator_limit, parameters.actuator_limit)
         )
-        clipped[index] = abs(applied_control[index] - request) > 1e-10
+        clipped[index] = abs(request) > parameters.actuator_limit
 
     metadata = {
         "implementation_mode": "corrected_information_fair",
@@ -267,12 +332,24 @@ def run_fair_imc_fxlms(
             "type": "l2_ball",
             "radius": parameters.coefficient_projection_radius,
         },
+        "leakage": parameters.leakage,
+        "anti_windup_mode": (
+            "freeze_update_on_previous_saturation"
+            if parameters.freeze_update_on_saturation
+            else "continue_update"
+        ),
+        "actuator_slab_projection": parameters.actuator_slab_projection,
+        "actuator_slab_relative_margin": parameters.actuator_slab_relative_margin,
         "actuator_saturation": {
             "type": "symmetric_hard_clip",
             "limit": parameters.actuator_limit,
         },
         "require_no_clipping": parameters.require_no_clipping,
-        "adaptation_during_saturation": "continue_using_applied_control_history",
+        "adaptation_during_saturation": (
+            "freeze_update_after_saturation_using_applied_control_history"
+            if parameters.freeze_update_on_saturation
+            else "continue_using_applied_control_history"
+        ),
         "plant_information_budget": plant_information_budget,
     }
     return FairBaselineRun(
@@ -285,6 +362,8 @@ def run_fair_imc_fxlms(
         reconstructed_disturbance=reconstructed,
         filtered_x=filtered_x,
         coefficient_projected=projected,
+        actuator_slab_projected=slab_projected,
+        coefficient_update_frozen=update_frozen,
         numerical_failure=numerical_failure,
         coefficients=coefficients,
         adaptation_start_sample=parameters.adaptation_start_sample,
@@ -323,6 +402,11 @@ def compute_fair_metrics(
         else specification.evaluation_stop_sample
     )
     evaluation_slice = slice(specification.evaluation_start_sample, evaluation_stop)
+    tail_start = (
+        specification.evaluation_start_sample
+        if specification.tail_evaluation_start_sample is None
+        else specification.tail_evaluation_start_sample
+    )
 
     window_starts = np.arange(
         specification.evaluation_start_sample,
@@ -362,11 +446,56 @@ def compute_fair_metrics(
         time_to_seconds = None
         reached_sample = None
 
+    settled_indices = np.asarray(
+        [
+            index
+            for index in reached_indices
+            if np.all(
+                sustained_attenuation[index:]
+                >= specification.target_attenuation_db
+            )
+        ],
+        dtype=int,
+    )
+    if settled_indices.size:
+        settled_window_start = int(window_starts[int(settled_indices[0])])
+        settled_confirmation_sample = (
+            settled_window_start + specification.sustain_duration_samples - 1
+        )
+        settled_elapsed_samples = (
+            settled_confirmation_sample + 1 - run.adaptation_start_sample
+        )
+        settled_status = "reached"
+        settled_samples: int | None = settled_elapsed_samples
+        settled_seconds: float | None = settled_elapsed_samples / sample_rate_hz
+        settled_sample: int | None = settled_confirmation_sample
+    else:
+        settled_status = "not_reached"
+        settled_samples = None
+        settled_seconds = None
+        settled_sample = None
+
+    loss_of_regulation_count = (
+        0
+        if not reached_indices.size
+        else int(
+            np.count_nonzero(
+                sustained_attenuation[int(reached_indices[0]) + 1 :]
+                < specification.target_attenuation_db
+            )
+        )
+    )
+    tail_windows = sustained_attenuation[window_starts >= tail_start]
+    if not tail_windows.size:
+        raise ValueError("no sustained window lies inside the tail evaluation segment")
+
     demand = run.control_demand[evaluation_slice]
     applied = run.applied_control[evaluation_slice]
     clipped = run.clipped[evaluation_slice]
     numerical_failures = int(np.count_nonzero(run.numerical_failure[evaluation_slice]))
     saturation_count = int(np.count_nonzero(clipped))
+    demand_limit = float(run.metadata["actuator_saturation"]["limit"])
+    demand_violation_count = int(np.count_nonzero(np.abs(demand) > demand_limit))
     evaluation_samples = int(demand.size)
     disturbance_peak = float(np.max(np.abs(d_sig[evaluation_slice])))
     bound_satisfied = (
@@ -392,6 +521,7 @@ def compute_fair_metrics(
         },
         "evaluation_start_sample": specification.evaluation_start_sample,
         "evaluation_stop_sample_exclusive": evaluation_stop,
+        "tail_evaluation_start_sample": tail_start,
         "plant_information_budget_id": run.metadata["plant_information_budget"][
             "id"
         ],
@@ -405,7 +535,19 @@ def compute_fair_metrics(
         "time_to_10db_samples": time_to_samples,
         "time_to_10db_seconds": time_to_seconds,
         "time_to_10db_reached_sample": reached_sample,
+        "time_to_10db_semantics": (
+            "first_sustained_window_hit_diagnostic_not_convergence"
+        ),
+        "settled_time_to_10db_status": settled_status,
+        "settled_time_to_10db_samples": settled_samples,
+        "settled_time_to_10db_seconds": settled_seconds,
+        "settled_time_to_10db_reached_sample": settled_sample,
+        "settled_time_to_10db_semantics": (
+            "earliest_window_after_which_all_remaining_windows_meet_target"
+        ),
+        "loss_of_regulation_count": loss_of_regulation_count,
         "worst_sustained_attenuation_db": float(np.min(sustained_attenuation)),
+        "tail_worst_sustained_attenuation_db": float(np.min(tail_windows)),
         "best_sustained_attenuation_db": float(np.max(sustained_attenuation)),
         "evaluation_attenuation_db": _attenuation_db(
             d_sig[evaluation_slice], run.residual[evaluation_slice]
@@ -416,11 +558,24 @@ def compute_fair_metrics(
         "applied_control_rms": _rms(applied),
         "saturation_count": saturation_count,
         "saturation_fraction": saturation_count / evaluation_samples,
+        "control_demand_limit_violation_count": demand_violation_count,
         "coefficient_projection_count": int(
             np.count_nonzero(run.coefficient_projected[evaluation_slice])
         ),
         "coefficient_projection_count_total": int(
             np.count_nonzero(run.coefficient_projected)
+        ),
+        "actuator_slab_projection_count": int(
+            np.count_nonzero(run.actuator_slab_projected[evaluation_slice])
+        ),
+        "actuator_slab_projection_count_total": int(
+            np.count_nonzero(run.actuator_slab_projected)
+        ),
+        "coefficient_update_frozen_count": int(
+            np.count_nonzero(run.coefficient_update_frozen[evaluation_slice])
+        ),
+        "coefficient_update_frozen_count_total": int(
+            np.count_nonzero(run.coefficient_update_frozen)
         ),
         "final_coefficient_norm": float(np.linalg.norm(run.coefficients)),
         "numerical_failure_count": numerical_failures,
